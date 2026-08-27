@@ -1,0 +1,23 @@
+{
+  "name": "@relyper/sp-auth",
+  "version": "0.1.0",
+  "description": "Service Provider SDK for integrating with Relyper Identity Provider",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "auth",
+    "identity",
+    "provider",
+    "idp"
+  ],
+  "author": "Jonas Esser",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}
