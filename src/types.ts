@@ -1,6 +1,6 @@
-/** Identitaet, die der Relyper-IdP ueber das Gateway an einen Service Provider weiterreicht. */
+/** Identity that the Relyper IdP passes to a service provider via the gateway. */
 export type RelyperIdentity = {
-  /** Stabile, eindeutige Kennung des Nutzers beim IdP. Niemals die lokale Datenbank-ID. */
+  /** Stable, unique identifier of the user at the IdP. Never the local database ID. */
   subject: string;
   email: string;
   displayName: string;
@@ -11,13 +11,13 @@ export type RelyperAuthFailureCode = 'missing_subject' | 'missing_email' | 'miss
 
 export type RelyperAuthFailure = {
   ok: false;
-  /** HTTP-Status, den der Adapter senden soll. */
+  /** HTTP status the adapter should send. */
   status: number;
   code: RelyperAuthFailureCode;
   message: string;
   /**
-   * Rollen, die das Gateway mitgeschickt hat. Ausschliesslich fuer Logging und
-   * Fehlersuche gedacht, niemals als Autorisierungsgrundlage.
+   * Roles the gateway sent along. Intended solely for logging and
+   * debugging, never as a basis for authorization.
    */
   presentedRoles: string[];
 };
@@ -25,7 +25,7 @@ export type RelyperAuthFailure = {
 export type RelyperAuthSuccess = {
   ok: true;
   identity: RelyperIdentity;
-  /** true, wenn die Identitaet aus der Dev-Auth stammt und nicht vom Gateway. */
+  /** true if the identity came from dev auth rather than the gateway. */
   viaDevAuth: boolean;
 };
 
@@ -39,15 +39,15 @@ export type RelyperHeaderNames = {
 };
 
 /**
- * Header-Quelle. Unterstuetzt sowohl das einfache Objekt aus Node/Fastify als
- * auch alles mit einer `get`-Methode, etwa die Headers der Fetch-API.
+ * Header source. Supports both the plain object from Node/Fastify and
+ * anything with a `get` method, such as the Fetch API's Headers.
  */
 export type RelyperHeaderSource =
   | Record<string, string | string[] | undefined>
   | { get(name: string): string | null | undefined };
 
 export type RelyperDevAuthOptions = {
-  /** Standard: true, sobald ein Objekt uebergeben wird. */
+  /** Default: true, as soon as an object is passed. */
   enabled?: boolean;
   subject?: string;
   email?: string;
@@ -56,31 +56,31 @@ export type RelyperDevAuthOptions = {
 };
 
 export type RelyperAuthOptions = {
-  /** Rolle(n), die der Nutzer fuer diesen Service Provider braucht. Leer heisst: keine Rollenpruefung. */
+  /** Role(s) the user needs for this service provider. Empty means: no role check. */
   requiredRole?: string | string[];
-  /** Bei mehreren Pflichtrollen: eine genuegt ('any', Standard) oder alle noetig ('all'). */
+  /** With multiple required roles: one is enough ('any', default) or all are needed ('all'). */
   roleMatch?: 'any' | 'all';
-  /** Standard: true. Auf false setzen, wenn der IdP keine Mailadresse liefert. */
+  /** Default: true. Set to false if the IdP does not supply an email address. */
   requireEmail?: boolean;
-  /** Abweichende Header-Namen, etwa bei einem anderen Gateway-Praefix. */
+  /** Custom header names, e.g. for a different gateway prefix. */
   headerNames?: Partial<RelyperHeaderNames>;
   /**
-   * `x-forwarded-*` als Rueckfallebene akzeptieren. Standard: false.
-   * Bewusst aus, weil diese Header von generischen Proxies stammen koennen.
+   * Accept `x-forwarded-*` as a fallback. Default: false.
+   * Deliberately off because these headers can come from generic proxies.
    */
   acceptForwardedHeaders?: boolean | Partial<RelyperHeaderNames>;
   /**
-   * Entwicklungs-Login ohne Gateway. Standard: aus.
-   * Muss in Produktion aus bleiben, sonst authentifiziert sich jeder Aufrufer selbst.
+   * Development login without a gateway. Default: off.
+   * Must stay off in production, otherwise any caller authenticates itself.
    */
   devAuth?: RelyperDevAuthOptions | false;
-  /** Status, wenn gar keine Identitaet ankommt. Standard: 401. */
+  /** Status when no identity arrives at all. Default: 401. */
   unauthenticatedStatus?: number;
-  /** Status, wenn die Identitaet stimmt, aber die Rolle fehlt. Standard: 403. */
+  /** Status when the identity is valid but the role is missing. Default: 403. */
   forbiddenStatus?: number;
-  /** Fester Text oder Funktion fuer die Fehlermeldung. */
+  /** Fixed text or function for the error message. */
   message?: string | ((failure: Omit<RelyperAuthFailure, 'message'>) => string);
-  /** Eigene Zerlegung des Rollen-Headers, falls das Gateway kein Komma benutzt. */
+  /** Custom parsing of the roles header, in case the gateway does not use a comma. */
   parseRoles?: (raw: string) => string[];
 };
 

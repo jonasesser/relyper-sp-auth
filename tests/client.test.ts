@@ -6,7 +6,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe('fetchRelyperSession', () => {
-  it('liefert den Nutzer aus einer /me-Antwort', async () => {
+  it('returns the user from a /me response', async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ user: { id: 'db-1', email: 'jonas@relyper.test' } }));
     const session = await fetchRelyperSession<{ id: string }>({ fetch: fetchMock });
 
@@ -16,7 +16,7 @@ describe('fetchRelyperSession', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/me', expect.objectContaining({ method: 'GET' }));
   });
 
-  it('akzeptiert auch eine Antwort ohne user-Huelle', async () => {
+  it('also accepts a response without a user wrapper', async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ id: 'db-2' }));
     const session = await fetchRelyperSession<{ id: string }>({ fetch: fetchMock });
 
@@ -25,7 +25,7 @@ describe('fetchRelyperSession', () => {
     expect(session.user.id).toBe('db-2');
   });
 
-  it('unterscheidet nicht angemeldet von keine Berechtigung', async () => {
+  it('distinguishes unauthenticated from forbidden', async () => {
     const unauthenticated = await fetchRelyperSession({ fetch: async () => jsonResponse({}, 401) });
     const forbidden = await fetchRelyperSession({ fetch: async () => jsonResponse({}, 403) });
 
@@ -33,12 +33,12 @@ describe('fetchRelyperSession', () => {
     expect(forbidden.status).toBe('forbidden');
   });
 
-  it('meldet andere Fehler als error statt zu werfen', async () => {
+  it('reports other errors as error instead of throwing', async () => {
     const session = await fetchRelyperSession({ fetch: async () => jsonResponse({}, 500) });
     expect(session.status).toBe('error');
   });
 
-  it('erlaubt einen eigenen Pfad', async () => {
+  it('allows a custom path', async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ user: {} }));
     await fetchRelyperSession({ fetch: fetchMock, path: '/api/session' });
     expect(fetchMock).toHaveBeenCalledWith('/api/session', expect.anything());
@@ -46,7 +46,7 @@ describe('fetchRelyperSession', () => {
 });
 
 describe('hasAnyRole', () => {
-  it('prueft Rollen ohne Serverkontakt', () => {
+  it('checks roles without contacting the server', () => {
     expect(hasAnyRole({ roles: ['a', 'b'] }, ['b'])).toBe(true);
     expect(hasAnyRole({ roles: ['a'] }, ['b', 'c'])).toBe(false);
   });

@@ -32,8 +32,8 @@ async function buildApp(options: Parameters<typeof relyperAuth>[1] = {}): Promis
   return instance;
 }
 
-describe('Fastify-Adapter', () => {
-  it('laesst eine gueltige Identitaet durch und legt sie an den Request', async () => {
+describe('Fastify adapter', () => {
+  it('lets a valid identity through and attaches it to the request', async () => {
     const instance = await buildApp();
     const response = await instance.inject({ method: 'GET', url: '/api/secret', headers });
 
@@ -41,7 +41,7 @@ describe('Fastify-Adapter', () => {
     expect(response.json().identity).toMatchObject({ subject: 'idp-subject-1', roles: [ROLE] });
   });
 
-  it('blockt Anfragen ohne Identitaet mit 401', async () => {
+  it('blocks requests without an identity with 401', async () => {
     const instance = await buildApp();
     const response = await instance.inject({ method: 'GET', url: '/api/secret' });
 
@@ -49,25 +49,25 @@ describe('Fastify-Adapter', () => {
     expect(response.json()).toEqual({ error: 'Authentication required.' });
   });
 
-  it('blockt Anfragen mit falscher Rolle mit 403', async () => {
+  it('blocks requests with the wrong role with 403', async () => {
     const instance = await buildApp();
     const response = await instance.inject({
       method: 'GET',
       url: '/api/secret',
-      headers: { ...headers, 'x-relyper-roles': 'andere_rolle' }
+      headers: { ...headers, 'x-relyper-roles': 'other_role' }
     });
 
     expect(response.statusCode).toBe(403);
   });
 
-  it('schuetzt nur die Pfade, die protect auswaehlt', async () => {
+  it('protects only the paths selected by protect', async () => {
     const instance = await buildApp({ protect: (request) => request.url.startsWith('/api/') });
 
     expect((await instance.inject({ method: 'GET', url: '/public' })).statusCode).toBe(200);
     expect((await instance.inject({ method: 'GET', url: '/api/secret' })).statusCode).toBe(401);
   });
 
-  it('uebersetzt die Identitaet per resolveUser in das Nutzerobjekt der Anwendung', async () => {
+  it('translates the identity into the application user object via resolveUser', async () => {
     const resolveUser = vi.fn(async (identity: RelyperIdentity) => ({
       id: `db-${identity.subject}`,
       email: identity.email
@@ -80,8 +80,8 @@ describe('Fastify-Adapter', () => {
     expect(resolveUser).toHaveBeenCalledTimes(1);
   });
 
-  it('ruft resolveUser bei abgewiesenen Anfragen nicht auf', async () => {
-    const resolveUser = vi.fn(async () => ({ id: 'sollte-nicht-passieren' }));
+  it('does not call resolveUser for rejected requests', async () => {
+    const resolveUser = vi.fn(async () => ({ id: 'should-not-happen' }));
     const instance = await buildApp({ resolveUser });
     const response = await instance.inject({ method: 'GET', url: '/api/secret' });
 
@@ -89,7 +89,7 @@ describe('Fastify-Adapter', () => {
     expect(resolveUser).not.toHaveBeenCalled();
   });
 
-  it('registriert die /me-Route nur auf Wunsch', async () => {
+  it('registers the /me route only on request', async () => {
     const withoutRoute = await buildApp();
     expect((await withoutRoute.inject({ method: 'GET', url: '/api/me', headers })).statusCode).toBe(404);
     await withoutRoute.close();
@@ -104,23 +104,23 @@ describe('Fastify-Adapter', () => {
     expect(response.json()).toEqual({ user: { id: 'db-idp-subject-1' } });
   });
 
-  it('meldet Fehlversuche an onAuthFailure, etwa fuers Audit-Log', async () => {
+  it('reports failed attempts to onAuthFailure, e.g. for an audit log', async () => {
     const onAuthFailure = vi.fn();
     const instance = await buildApp({ onAuthFailure });
-    await instance.inject({ method: 'GET', url: '/api/secret', headers: { ...headers, 'x-relyper-roles': 'falsch' } });
+    await instance.inject({ method: 'GET', url: '/api/secret', headers: { ...headers, 'x-relyper-roles': 'wrong' } });
 
     expect(onAuthFailure).toHaveBeenCalledTimes(1);
     expect(onAuthFailure.mock.calls[0][0]).toMatchObject({ code: 'missing_role', status: 403 });
   });
 
-  it('erlaubt einen eigenen Fehlerkoerper', async () => {
-    const instance = await buildApp({ errorBody: (failure) => ({ code: failure.code, hint: 'Bitte anmelden.' }) });
+  it('allows a custom error body', async () => {
+    const instance = await buildApp({ errorBody: (failure) => ({ code: failure.code, hint: 'Please sign in.' }) });
     const response = await instance.inject({ method: 'GET', url: '/api/secret' });
 
-    expect(response.json()).toEqual({ code: 'missing_subject', hint: 'Bitte anmelden.' });
+    expect(response.json()).toEqual({ code: 'missing_subject', hint: 'Please sign in.' });
   });
 
-  it('stellt die Rollenpruefung als Decorator bereit', async () => {
+  it('exposes the role check as a decorator', async () => {
     const instance = await buildApp();
     expect(instance.relyperAuth.hasRole({ subject: 's', email: 'e', displayName: 'd', roles: [ROLE] }, ROLE)).toBe(true);
     expect(instance.relyperAuth.hasRole({ subject: 's', email: 'e', displayName: 'd', roles: [] }, ROLE)).toBe(false);

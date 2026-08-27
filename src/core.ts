@@ -15,7 +15,7 @@ export const DEFAULT_HEADER_NAMES: RelyperHeaderNames = {
   roles: 'x-relyper-roles'
 };
 
-/** Uebliche Header eines generischen Auth-Proxys, nur auf ausdruecklichen Wunsch aktiv. */
+/** Common headers of a generic auth proxy, only active on explicit request. */
 export const FORWARDED_HEADER_NAMES: RelyperHeaderNames = {
   subject: 'x-forwarded-user',
   email: 'x-forwarded-email',
@@ -81,9 +81,9 @@ function resolveOptions(options: RelyperAuthOptions): ResolvedRelyperAuthOptions
 
 export type RelyperAuth = {
   readonly options: ResolvedRelyperAuthOptions;
-  /** Prueft Header und liefert entweder eine Identitaet oder einen Fehler mit HTTP-Status. */
+  /** Checks headers and returns either an identity or a failure with an HTTP status. */
   authenticate(headers: RelyperHeaderSource): RelyperAuthResult;
-  /** Rollenpruefung fuer zusaetzliche Gates innerhalb der Anwendung. */
+  /** Role check for additional gates inside the application. */
   hasRole(identity: RelyperIdentity, role: string | string[], match?: 'any' | 'all'): boolean;
 };
 

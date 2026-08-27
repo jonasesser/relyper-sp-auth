@@ -14,7 +14,7 @@ function gatewayHeaders(overrides: Record<string, string | string[] | undefined>
 }
 
 describe('createRelyperAuth', () => {
-  it('nimmt eine vollstaendige Identitaet vom Gateway an', () => {
+  it('accepts a complete identity from the gateway', () => {
     const auth = createRelyperAuth({ requiredRole: ROLE });
     const result = auth.authenticate(gatewayHeaders());
 
@@ -29,7 +29,7 @@ describe('createRelyperAuth', () => {
     expect(result.viaDevAuth).toBe(false);
   });
 
-  it('antwortet ohne Identitaet mit 401', () => {
+  it('responds with 401 when there is no identity', () => {
     const auth = createRelyperAuth({ requiredRole: ROLE });
     const result = auth.authenticate({});
 
@@ -39,18 +39,18 @@ describe('createRelyperAuth', () => {
     expect(result.code).toBe('missing_subject');
   });
 
-  it('unterscheidet fehlende Rolle (403) von fehlender Identitaet (401)', () => {
+  it('distinguishes a missing role (403) from a missing identity (401)', () => {
     const auth = createRelyperAuth({ requiredRole: ROLE });
-    const result = auth.authenticate(gatewayHeaders({ 'x-relyper-roles': 'irgendeine_andere_rolle' }));
+    const result = auth.authenticate(gatewayHeaders({ 'x-relyper-roles': 'some_other_role' }));
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.status).toBe(403);
     expect(result.code).toBe('missing_role');
-    expect(result.presentedRoles).toEqual(['irgendeine_andere_rolle']);
+    expect(result.presentedRoles).toEqual(['some_other_role']);
   });
 
-  it('erlaubt eigene Statuscodes fuer Anwendungen, die nicht zwischen 401 und 403 trennen', () => {
+  it('allows custom status codes for applications that do not distinguish 401 from 403', () => {
     const auth = createRelyperAuth({ requiredRole: ROLE, unauthenticatedStatus: 403 });
     const result = auth.authenticate({});
 
@@ -59,7 +59,7 @@ describe('createRelyperAuth', () => {
     expect(result.status).toBe(403);
   });
 
-  it('verlangt standardmaessig eine Mailadresse, laesst sich aber abschalten', () => {
+  it('requires an email address by default, but can be relaxed', () => {
     const strict = createRelyperAuth({ requiredRole: ROLE });
     const relaxed = createRelyperAuth({ requiredRole: ROLE, requireEmail: false });
     const headers = gatewayHeaders({ 'x-relyper-email': undefined });
@@ -68,32 +68,32 @@ describe('createRelyperAuth', () => {
     expect(relaxed.authenticate(headers).ok).toBe(true);
   });
 
-  it('prueft bei roleMatch "all" jede geforderte Rolle', () => {
+  it('checks every required role when roleMatch is "all"', () => {
     const auth = createRelyperAuth({ requiredRole: [ROLE, 'relyper_admin'], roleMatch: 'all' });
 
     expect(auth.authenticate(gatewayHeaders()).ok).toBe(false);
     expect(auth.authenticate(gatewayHeaders({ 'x-relyper-roles': `${ROLE},relyper_admin` })).ok).toBe(true);
   });
 
-  it('prueft ohne requiredRole nur die Identitaet', () => {
+  it('checks only the identity when requiredRole is not set', () => {
     const auth = createRelyperAuth();
     expect(auth.authenticate(gatewayHeaders({ 'x-relyper-roles': '' })).ok).toBe(true);
   });
 });
 
-describe('x-forwarded-Header', () => {
+describe('x-forwarded headers', () => {
   const forwarded = {
     'x-forwarded-user': 'proxy-subject',
     'x-forwarded-email': 'proxy@relyper.test',
     'x-forwarded-groups': ROLE
   };
 
-  it('ignoriert sie standardmaessig', () => {
+  it('ignores them by default', () => {
     const auth = createRelyperAuth({ requiredRole: ROLE });
     expect(auth.authenticate(forwarded).ok).toBe(false);
   });
 
-  it('akzeptiert sie nur auf ausdruecklichen Wunsch', () => {
+  it('accepts them only on explicit request', () => {
     const auth = createRelyperAuth({ requiredRole: ROLE, acceptForwardedHeaders: true });
     const result = auth.authenticate(forwarded);
 
@@ -102,7 +102,7 @@ describe('x-forwarded-Header', () => {
     expect(result.identity.subject).toBe('proxy-subject');
   });
 
-  it('laesst den Relyper-Header vorgehen', () => {
+  it('lets the Relyper header take precedence', () => {
     const auth = createRelyperAuth({ requiredRole: ROLE, acceptForwardedHeaders: true });
     const result = auth.authenticate({ ...forwarded, ...gatewayHeaders() });
 
@@ -112,13 +112,13 @@ describe('x-forwarded-Header', () => {
   });
 });
 
-describe('Dev-Auth', () => {
-  it('ist standardmaessig aus', () => {
+describe('dev auth', () => {
+  it('is off by default', () => {
     const auth = createRelyperAuth({ requiredRole: ROLE });
     expect(auth.authenticate({}).ok).toBe(false);
   });
 
-  it('erzeugt eingeschaltet eine lokale Identitaet mit der Pflichtrolle', () => {
+  it('when enabled, produces a local identity with the required role', () => {
     const auth = createRelyperAuth({ requiredRole: ROLE, devAuth: {} });
     const result = auth.authenticate({});
 
@@ -129,7 +129,7 @@ describe('Dev-Auth', () => {
     expect(result.viaDevAuth).toBe(true);
   });
 
-  it('laesst echte Gateway-Header vorgehen und meldet dann keine Dev-Auth', () => {
+  it('lets real gateway headers take precedence and then reports no dev auth', () => {
     const auth = createRelyperAuth({ requiredRole: ROLE, devAuth: {} });
     const result = auth.authenticate(gatewayHeaders());
 
@@ -139,14 +139,14 @@ describe('Dev-Auth', () => {
     expect(result.viaDevAuth).toBe(false);
   });
 
-  it('bleibt bei enabled: false aus', () => {
+  it('stays off with enabled: false', () => {
     const auth = createRelyperAuth({ requiredRole: ROLE, devAuth: { enabled: false } });
     expect(auth.authenticate({}).ok).toBe(false);
   });
 });
 
-describe('Header-Quellen und Rollen', () => {
-  it('liest Header aus einem Headers-Objekt der Fetch-API', () => {
+describe('header sources and roles', () => {
+  it('reads headers from a Fetch API Headers object', () => {
     const auth = createRelyperAuth({ requiredRole: ROLE });
     const headers = new Headers(gatewayHeaders() as Record<string, string>);
     const result = auth.authenticate(headers);
@@ -156,35 +156,35 @@ describe('Header-Quellen und Rollen', () => {
     expect(result.identity.email).toBe('jonas@relyper.test');
   });
 
-  it('nimmt bei mehrfach gesetzten Headern den ersten Wert', () => {
+  it('takes the first value when a header is set multiple times', () => {
     const auth = createRelyperAuth({ requiredRole: ROLE });
-    const result = auth.authenticate(gatewayHeaders({ 'x-relyper-subject': ['erster', 'zweiter'] }));
+    const result = auth.authenticate(gatewayHeaders({ 'x-relyper-subject': ['first', 'second'] }));
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.identity.subject).toBe('erster');
+    expect(result.identity.subject).toBe('first');
   });
 
-  it('zerlegt Rollenlisten robust', () => {
+  it('parses role lists robustly', () => {
     expect(parseRoleList(' a , b ,, c ')).toEqual(['a', 'b', 'c']);
     expect(parseRoleList('')).toEqual([]);
   });
 
-  it('erlaubt eine eigene Rollen-Zerlegung', () => {
+  it('allows a custom role parser', () => {
     const auth = createRelyperAuth({ requiredRole: ROLE, parseRoles: (raw) => raw.split(' ').filter(Boolean) });
-    const result = auth.authenticate(gatewayHeaders({ 'x-relyper-roles': `andere ${ROLE}` }));
+    const result = auth.authenticate(gatewayHeaders({ 'x-relyper-roles': `other ${ROLE}` }));
     expect(result.ok).toBe(true);
   });
 
-  it('liest Header unabhaengig von der Schreibweise', () => {
+  it('reads headers case-insensitively', () => {
     expect(readHeader({ 'x-relyper-subject': ' abc ' }, 'X-Relyper-Subject')).toBe('abc');
   });
 
-  it('uebernimmt eine feste Fehlermeldung', () => {
-    const auth = createRelyperAuth({ requiredRole: ROLE, message: 'Kein Zutritt.' });
+  it('accepts a fixed error message', () => {
+    const auth = createRelyperAuth({ requiredRole: ROLE, message: 'Access denied.' });
     const result = auth.authenticate({});
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.message).toBe('Kein Zutritt.');
+    expect(result.message).toBe('Access denied.');
   });
 });

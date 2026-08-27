@@ -1,27 +1,27 @@
 import type { RelyperIdentity } from './types.js';
 
 /**
- * Framework-freier Browser-Client fuer die /me-Route eines Service Providers.
- * Bewusst ohne Vue/React-Abhaengigkeit: ein Composable oder Hook darum herum
- * ist in der Anwendung ein Zehnzeiler.
+ * Framework-free browser client for a service provider's /me route.
+ * Deliberately without a Vue/React dependency: a composable or hook wrapping
+ * it is a ten-liner in the application.
  */
 
 export type RelyperSession<TUser = RelyperIdentity> =
   | { status: 'authenticated'; user: TUser }
-  /** Keine Identitaet am Gateway vorbei. Typisch: Login noetig. */
+  /** No identity passed through the gateway. Typically: login required. */
   | { status: 'unauthenticated'; response: Response }
-  /** Angemeldet, aber ohne die Rolle fuer diesen Service Provider. */
+  /** Signed in, but without the role required for this service provider. */
   | { status: 'forbidden'; response: Response }
   | { status: 'error'; response: Response };
 
 export type FetchSessionOptions = {
-  /** Standard: '/api/me'. */
+  /** Default: '/api/me'. */
   path?: string;
-  /** Eigene fetch-Implementierung, etwa fuer Tests oder SSR. */
+  /** Custom fetch implementation, e.g. for tests or SSR. */
   fetch?: typeof globalThis.fetch;
   headers?: Record<string, string>;
   signal?: AbortSignal;
-  /** Standard: 'same-origin'. */
+  /** Default: 'same-origin'. */
   credentials?: RequestCredentials;
 };
 
@@ -47,7 +47,7 @@ export async function fetchRelyperSession<TUser = RelyperIdentity>(
   return { status: 'authenticated', user };
 }
 
-/** true, wenn die Identitaet mindestens eine der Rollen besitzt. */
+/** true if the identity has at least one of the given roles. */
 export function hasAnyRole(identity: Pick<RelyperIdentity, 'roles'>, roles: string[]): boolean {
   return roles.some((role) => identity.roles.includes(role));
 }
