@@ -1,44 +1,145 @@
 # @relyper/sp-auth
 
-Service Provider SDK for integrating with **Relyper Identity Provider**.
+Service-provider side of Relyper identity: turn gateway headers into a typed
+principal, gate access by role, and keep the identity layer out of your
+application code.
 
-This module allows external service providers to authenticate their users against Relyper's centralized identity provider. It handles OAuth 2.0 / OIDC flows and provides utilities for secure token management and session handling.
-
-## Installation
+Built for services that sit behind the Relyper auth gateway. The package covers
+the parts every service provider repeats — header parsing, role gating, the
+`/me` contract, dev login — and leaves persistence to you.
 
 ```bash
 npm install @relyper/sp-auth
 ```
 
-## Quick Start
+Requires Node 20+. ESM only.
 
-```typescript
-import { ServiceProviderAuth } from '@relyper/sp-auth';
+## Quick start (Fastify)
 
-const auth = new ServiceProviderAuth({
-  clientId: 'your-client-id',
-  clientSecret: 'your-client-secret',
-  redirectUri: 'https://your-app.com/callback'
+```ts
+import Fastify from 'fastify';
+import { relyperAuth } from '@relyper/sp-auth/fastify';
+
+const app = Fastify();
+
+await app.register(relyperAuth, {
+  requiredRole: 'my_service_user',
+  protect: (request) => request.url.startsWith('/api/'),
+  meRoute: '/api/me',
+  // Turn the IdP identity into your own user record.
+  resolveUser: async (identity) => prisma.user.upsert({
+    where: { idpSubject: identity.subject },
+    create: { idpSubject: identity.subject, email: identity.email, displayName: identity.displayName, roles: identity.roles },
+    update: { email: identity.email, displayName: identity.displayName, roles: identity.roles, lastSeenAt: new Date() }
+  })
 });
 
-const token = auth.authenticate();
+app.get('/api/cases', async (request) => {
+  request.relyperIdentity; // { subject, email, displayName, roles }
+  request.principal;       // whatever resolveUser returned
+});
 ```
 
-## Development
+Declare the type of your own principal once:
 
-```bash
-npm run dev
+```ts
+declare module 'fastify' {
+  interface FastifyRequest {
+    principal: { id: string; email: string };
+  }
+}
 ```
 
-## Build
+## Without Fastify
 
-```bash
-npm run build
+The core is a pure function over headers — no framework, no I/O:
+
+```ts
+import { createRelyperAuth } from '@relyper/sp-auth';
+
+const auth = createRelyperAuth({ requiredRole: 'my_service_user' });
+const result = auth.authenticate(request.headers); // Node headers or a fetch Headers object
+
+if (!result.ok) {
+  return new Response(JSON.stringify({ error: result.message }), { status: result.status });
+}
+result.identity.subject;
 ```
 
-## Documentation
+`authenticate` never throws and never does I/O, which makes it easy to unit test
+and safe to call on every request.
 
-For detailed integration documentation, see [Relyper Documentation](https://docs.relyper.dev).
+## Browser client
+
+```ts
+import { fetchRelyperSession } from '@relyper/sp-auth/client';
+
+const session = await fetchRelyperSession<{ id: string; email: string }>();
+
+switch (session.status) {
+  case 'authenticated': return session.user;
+  case 'unauthenticated': return redirectToLogin();
+  case 'forbidden': return showNoAccessScreen();
+  case 'error': return showError();
+}
+```
+
+No framework dependency. A Vue composable or React hook around it is a few lines.
+
+## Options
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `requiredRole` | – | Role(s) required for this service. Omit to only require an identity. |
+| `roleMatch` | `'any'` | With several required roles: one is enough, or all are needed. |
+| `requireEmail` | `true` | Set to `false` if your IdP does not send an address. |
+| `headerNames` | Relyper headers | Override individual header names for another gateway. |
+| `acceptForwardedHeaders` | `false` | Also accept `x-forwarded-*`. Off by default on purpose. |
+| `devAuth` | `false` | Local login without a gateway. Never enable in production. |
+| `unauthenticatedStatus` | `401` | Status when no identity arrives. |
+| `forbiddenStatus` | `403` | Status when the role is missing. |
+| `message` | per code | Fixed string or a function for the error message. |
+| `parseRoles` | comma-separated | Custom splitting of the roles header. |
+
+Fastify adapter additions: `protect`, `hook`, `resolveUser`, `principalKey`,
+`meRoute`, `meResponse`, `errorBody`, `onAuthFailure`, `warnOnDevAuth`.
+
+## Headers
+
+| Header | Meaning |
+| --- | --- |
+| `x-relyper-subject` | Stable user ID at the IdP |
+| `x-relyper-email` | E-mail address |
+| `x-relyper-name` | Display name |
+| `x-relyper-roles` | Comma-separated roles |
+
+Fallbacks when `acceptForwardedHeaders` is on: `x-forwarded-user`,
+`x-forwarded-email`, `x-forwarded-preferred-username`, `x-forwarded-groups`.
+
+## Security model — read this
+
+This package trusts headers. It does **not** verify a token or a signature. That
+is only safe when your service is unreachable except through a gateway that
+strips client-supplied `x-relyper-*` headers and sets them itself.
+
+If your service can be reached directly, anyone can send
+`x-relyper-roles: my_service_user` and be admitted. Two rules follow:
+
+- Never expose the service port publicly without the gateway in front of it.
+- Never enable `devAuth` in production. It is off by default, and the Fastify
+  adapter logs a warning the first time it is used.
+
+Token verification against the Relyper IdP (JWT/JWKS) is planned for a later
+version behind the same API, so switching should not require changes in calling
+code.
+
+## Design
+
+- `authenticate` is pure: headers in, result out. No database, no fetch, no throw.
+- Identity and application user stay separate. The package hands you a
+  `RelyperIdentity`; `resolveUser` maps it to your own record. That boundary is
+  what makes the package reusable across service providers.
+- `subject` is the IdP ID and never the primary key of your database.
 
 ## License
 

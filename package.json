@@ -1,23 +1,77 @@
 {
   "name": "@relyper/sp-auth",
   "version": "0.1.0",
-  "description": "Service Provider SDK for integrating with Relyper Identity Provider",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "description": "Service-provider side of Relyper identity: principal resolution from gateway headers, role gating, a Fastify adapter, and a framework-free browser client.",
+  "license": "MIT",
+  "author": "Jonas Esser",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
   },
   "keywords": [
-    "auth",
+    "relyper",
     "identity",
-    "provider",
-    "idp"
+    "authentication",
+    "authorization",
+    "service-provider",
+    "fastify",
+    "rbac"
   ],
-  "author": "Jonas Esser",
-  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jonasesser/relyper-sp-auth.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jonasesser/relyper-sp-auth/issues"
+  },
+  "homepage": "https://github.com/jonasesser/relyper-sp-auth#readme",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./fastify": {
+      "types": "./dist/fastify.d.ts",
+      "import": "./dist/fastify.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "fastify-plugin": "^5.1.0"
+  },
+  "peerDependencies": {
+    "fastify": ">=5"
+  },
+  "peerDependenciesMeta": {
+    "fastify": {
+      "optional": true
+    }
+  },
   "devDependencies": {
-    "typescript": "^5.3.0"
+    "@types/node": "^26.3.0",
+    "fastify": "^5.12.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
