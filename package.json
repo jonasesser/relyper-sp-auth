@@ -1,7 +1,7 @@
 {
   "name": "@relyper/sp-auth",
-  "version": "0.1.0",
-  "description": "Service-provider side of Relyper identity: principal resolution from gateway headers, role gating, a Fastify adapter, and a framework-free browser client.",
+  "version": "0.3.0",
+  "description": "Relyper identity for a service provider: an OIDC client (Authorization Code + PKCE) with a Fastify adapter and session cookies, plus the header-based variant for gateway deployments.",
   "license": "MIT",
   "author": "Jonas Esser",
   "type": "module",
@@ -16,7 +16,14 @@
     "authorization",
     "service-provider",
     "fastify",
-    "rbac"
+    "rbac",
+    "oidc",
+    "openid-connect",
+    "oauth2",
+    "pkce",
+    "sso",
+    "coins",
+    "billing"
   ],
   "repository": {
     "type": "git",
@@ -33,6 +40,14 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./oidc": {
+      "types": "./dist/oidc.d.ts",
+      "import": "./dist/oidc.js"
+    },
+    "./oidc/fastify": {
+      "types": "./dist/oidc-fastify.d.ts",
+      "import": "./dist/oidc-fastify.js"
+    },
     "./fastify": {
       "types": "./dist/fastify.d.ts",
       "import": "./dist/fastify.js"
@@ -41,7 +56,11 @@
       "types": "./dist/client.d.ts",
       "import": "./dist/client.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./coins": {
+      "types": "./dist/coins.d.ts",
+      "import": "./dist/coins.js"
+    }
   },
   "files": [
     "dist",
@@ -55,7 +74,8 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "fastify-plugin": "^5.1.0"
+    "fastify-plugin": "^5.1.0",
+    "jose": "^6.2.10"
   },
   "peerDependencies": {
     "fastify": ">=5"

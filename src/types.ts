@@ -1,10 +1,22 @@
-/** Identity that the Relyper IdP passes to a service provider via the gateway. */
+/**
+ * Identity of a user as this service provider sees it.
+ *
+ * Produced either by the OIDC login (verified ID token) or, in a gateway
+ * deployment, by the trusted request headers. The tenant fields are only filled
+ * in by the OIDC path, because a gateway header set does not carry them.
+ */
 export type RelyperIdentity = {
   /** Stable, unique identifier of the user at the IdP. Never the local database ID. */
   subject: string;
   email: string;
   displayName: string;
   roles: string[];
+  /** Tenant the user is acting in, or null if the IdP sent none. */
+  tenantId?: string | null;
+  /** Every tenant the user belongs to; the first one is {@link tenantId}. */
+  tenantIds?: string[];
+  tenantName?: string | null;
+  teams?: string[];
 };
 
 export type RelyperAuthFailureCode = 'missing_subject' | 'missing_email' | 'missing_role';
