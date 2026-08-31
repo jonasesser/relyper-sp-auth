@@ -68,6 +68,12 @@ export type RelyperCoinsErrorCode =
   | 'coins_not_enabled'
   /** Client credentials rejected. */
   | 'unauthorized'
+  /**
+   * Refused with 403 without saying it was the coin permission. Usually the
+   * request never reached the coins service: a wrong base URL, a gateway or a
+   * WAF. Read `url` and `responseBody` on the error.
+   */
+  | 'forbidden'
   /** The request was malformed. */
   | 'invalid_request'
   /** The identity provider was unreachable or answered unexpectedly. */
@@ -80,11 +86,31 @@ export class RelyperCoinsError extends Error {
   readonly balanceRc?: number;
   readonly requestedRc?: number;
   readonly cause?: unknown;
+  /**
+   * What the service actually answered, and where it was asked.
+   *
+   * Kept because a status code alone does not identify a cause: a 403 from the
+   * coins service and a 403 from a proxy in front of it are the same number and
+   * mean entirely different things. Without the body, an operator holding a
+   * correctly configured client has nothing to go on but a message this library
+   * guessed. `responseError` is the service's own error code when it sent one.
+   */
+  readonly url?: string;
+  readonly responseError?: string;
+  readonly responseBody?: string;
 
   constructor(
     code: RelyperCoinsErrorCode,
     message: string,
-    options: { status?: number; balanceRc?: number; requestedRc?: number; cause?: unknown } = {}
+    options: {
+      status?: number;
+      balanceRc?: number;
+      requestedRc?: number;
+      cause?: unknown;
+      url?: string;
+      responseError?: string;
+      responseBody?: string;
+    } = {}
   ) {
     super(message);
     this.name = 'RelyperCoinsError';
@@ -93,6 +119,9 @@ export class RelyperCoinsError extends Error {
     this.balanceRc = options.balanceRc;
     this.requestedRc = options.requestedRc;
     this.cause = options.cause;
+    this.url = options.url;
+    this.responseError = options.responseError;
+    this.responseBody = options.responseBody;
   }
 }
 
@@ -172,31 +201,53 @@ export function createRelyperCoinsClient(options: RelyperCoinsOptions): RelyperC
       throw new RelyperCoinsError('unavailable', 'The Relyper coin service could not be reached.', { cause });
     }
 
-    const payload = await readJson(response);
+    const { payload, raw } = await readBody(response);
     if (response.ok) return payload ?? {};
 
     const error = typeof payload?.error === 'string' ? payload.error : '';
+    // Passed to every throw below so the caller can log what was actually
+    // answered instead of only what this library concluded from it.
+    const evidence = { url, responseError: error || undefined, responseBody: raw || undefined };
+
     if (response.status === 402 || error === 'insufficient_funds') {
       throw new RelyperCoinsError('insufficient_funds', 'Not enough Relyper Coins.', {
         status: 402,
         balanceRc: numberOrUndefined(payload?.balanceRc),
-        requestedRc: numberOrUndefined(payload?.requestedRc)
+        requestedRc: numberOrUndefined(payload?.requestedRc),
+        ...evidence
       });
     }
-    if (response.status === 403 || error === 'coins_not_enabled_for_client') {
+    // Only the service's own error code identifies this cause. A bare 403 is
+    // not evidence of it: an unmatched route, a gateway or a WAF in front of
+    // the service answers with the same status, and reporting those as a
+    // permission the operator has already granted sends them looking in the
+    // wrong place.
+    if (error === 'coins_not_enabled_for_client') {
       throw new RelyperCoinsError('coins_not_enabled', 'This application is not allowed to spend Relyper Coins.', {
-        status: 403
+        status: response.status,
+        ...evidence
       });
     }
     if (response.status === 401) {
       throw new RelyperCoinsError('unauthorized', 'The Relyper coin service rejected this application.', {
-        status: 401
+        status: 401,
+        ...evidence
+      });
+    }
+    if (response.status === 403) {
+      throw new RelyperCoinsError('forbidden', 'The Relyper coin service refused this request with 403.', {
+        status: 403,
+        ...evidence
       });
     }
     if (response.status === 400) {
-      throw new RelyperCoinsError('invalid_request', 'The coin request was rejected as invalid.', { status: 400 });
+      throw new RelyperCoinsError('invalid_request', 'The coin request was rejected as invalid.', {
+        status: 400,
+        ...evidence
+      });
     }
     throw new RelyperCoinsError('unavailable', 'The Relyper coin service answered unexpectedly.', {
+      ...evidence,
       status: response.status
     });
   }
@@ -255,10 +306,25 @@ function numberOrUndefined(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
-async function readJson(response: Response): Promise<Record<string, any> | null> {
+/**
+ * Reads the body once, as text, and parses JSON from that text.
+ *
+ * `response.json()` consumes the stream, so a body that is not JSON -- an HTML
+ * error page from a gateway, most importantly -- would be lost before anyone
+ * could look at it. The raw text is what makes those cases diagnosable, so it
+ * is kept and truncated rather than discarded.
+ */
+async function readBody(response: Response): Promise<{ payload: Record<string, any> | null; raw: string }> {
+  let raw = '';
   try {
-    return (await response.json()) as Record<string, any>;
+    raw = await response.text();
   } catch {
-    return null;
+    return { payload: null, raw: '' };
+  }
+  const trimmed = raw.length > 500 ? raw.slice(0, 500) + '...' : raw;
+  try {
+    return { payload: JSON.parse(raw) as Record<string, any>, raw: trimmed };
+  } catch {
+    return { payload: null, raw: trimmed };
   }
 }

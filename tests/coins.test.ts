@@ -165,6 +165,29 @@ describe('debit', () => {
       .rejects.toMatchObject({ code: 'unauthorized', status: 401 });
   });
 
+  it('does not blame the coin permission for a 403 the service did not send', async () => {
+    // What a gateway, a WAF or an unmatched route answers: the right status,
+    // none of the meaning. Reporting this as a permission the operator has
+    // already granted is what sends them looking in the wrong place.
+    responder = () => ({ status: 403, body: { message: 'Forbidden' } });
+
+    const failure = await makeClient().getWallet(SUBJECT).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(RelyperCoinsError);
+    expect((failure as RelyperCoinsError).code).toBe('forbidden');
+    expect((failure as RelyperCoinsError).status).toBe(403);
+    // The evidence the caller needs to tell the two apart.
+    expect((failure as RelyperCoinsError).url).toBe(BASE_URL + '/integrations/coins/user/' + SUBJECT);
+    expect((failure as RelyperCoinsError).responseBody).toContain('Forbidden');
+    expect((failure as RelyperCoinsError).responseError).toBeUndefined();
+  });
+
+  it('keeps the service error code on the error it does recognise', async () => {
+    responder = () => ({ status: 403, body: { error: 'coins_not_enabled_for_client' } });
+    const failure = await makeClient().getWallet(SUBJECT).catch((error: unknown) => error);
+    expect((failure as RelyperCoinsError).code).toBe('coins_not_enabled');
+    expect((failure as RelyperCoinsError).responseError).toBe('coins_not_enabled_for_client');
+  });
+
   it('reports an unreachable service as unavailable', async () => {
     const client = createRelyperCoinsClient({
       baseUrl: BASE_URL,
