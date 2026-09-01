@@ -1,6 +1,6 @@
 {
   "name": "@relyper/sp-auth",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Relyper identity for a service provider: an OIDC client (Authorization Code + PKCE) with a Fastify adapter and session cookies, plus the header-based variant for gateway deployments.",
   "license": "MIT",
   "author": "Jonas Esser",
@@ -60,6 +60,10 @@
     "./coins": {
       "types": "./dist/coins.d.ts",
       "import": "./dist/coins.js"
+    },
+    "./ai": {
+      "types": "./dist/ai.d.ts",
+      "import": "./dist/ai.js"
     }
   },
   "files": [
