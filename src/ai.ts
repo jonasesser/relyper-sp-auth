@@ -64,9 +64,45 @@ export class RelyperAiError extends Error {
   }
 }
 
+export type RelyperAiTextPart = { type: 'text'; text: string };
+
+/**
+ * An image for the model to look at.
+ *
+ * Base64 only, deliberately: a URL would make the proxy fetch whatever the
+ * caller names, from inside the network that holds Relyper's provider keys.
+ *
+ * The proxy refuses what the upstreams will not take -- a model that cannot
+ * see (`model_has_no_vision`), an unsupported type (`unsupported_media_type`),
+ * more than 5 MB (`image_too_large`) or more than eight images
+ * (`too_many_images`). Those limits live there because a service provider has
+ * no way to know them; the named errors are so it can tell its own user which
+ * one it hit rather than reporting an outage.
+ */
+export type RelyperAiImagePart = {
+  type: 'image';
+  /** Raw base64, without a `data:` prefix. */
+  data: string;
+  /** image/png | image/jpeg | image/webp | image/gif */
+  mediaType: string;
+};
+
+export type RelyperAiContentPart = RelyperAiTextPart | RelyperAiImagePart;
+
 export type RelyperAiMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
+  /**
+   * A string, or parts when the message carries more than text.
+   *
+   * The string form means exactly what it always did, so every existing caller
+   * keeps working untouched. Parts are the additive way to send an image -- and
+   * the reason images did not need an endpoint of their own, with a second copy
+   * of the wallet check, the billing and the subject proof to keep in step.
+   *
+   * An image in a *system* message is dropped: Anthropic takes the system
+   * prompt as a plain string, so images belong in a user turn.
+   */
+  content: string | RelyperAiContentPart[];
   /** On a tool result: the call it answers. */
   toolCallId?: string;
   /** On an assistant turn that asked for tools. */
@@ -126,6 +162,13 @@ export type RelyperAiModel = {
   label: string;
   inputPerMTok: number;
   outputPerMTok: number;
+  /**
+   * Whether this model can read an image.
+   *
+   * Published so a caller picks one that can, instead of assembling a request
+   * with an image and learning otherwise from the refusal.
+   */
+  vision?: boolean;
 };
 
 /** Emitted while a call is streaming. `done` always arrives last. */
