@@ -1,6 +1,6 @@
 {
   "name": "@relyper/sp-auth",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Relyper identity for a service provider: an OIDC client (Authorization Code + PKCE) with a Fastify adapter and session cookies, plus the header-based variant for gateway deployments.",
   "license": "MIT",
   "author": "Jonas Esser",
