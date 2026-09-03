@@ -56,10 +56,38 @@ export type RelyperOidcOptions = {
   discoveryTtlMs?: number;
   /** Timeout for every call to the IdP, in milliseconds. Default: 10000. */
   requestTimeoutMs?: number;
-  /** Custom fetch implementation, e.g. for tests or a proxy-aware agent. */
+  /**
+   * Custom fetch implementation, e.g. for tests or a proxy-aware agent. When
+   * omitted, every call to the IdP (discovery, token exchange, JWKS, UserInfo)
+   * goes through this library's own default fetch instead of the bare global
+   * one -- see {@link OidcEdgeRejection} for why that matters in production.
+   */
   fetch?: typeof globalThis.fetch;
   /** Maps IdP claims onto the identity. Default: {@link defaultClaimsToIdentity}. */
   mapClaims?: (claims: Record<string, unknown>) => RelyperIdentity;
+  /**
+   * Called when the default fetch (i.e. `fetch` above was left unset) sees a
+   * response that looks like it came from something in front of the IdP --
+   * a WAF, a bot filter, a rate limiter -- rather than the IdP's own
+   * application code, and is retrying once. The IdP was never actually asked
+   * the question on that attempt, so nothing here is a login failure by
+   * itself; wire it to your logger if you want visibility into an edge layer
+   * that is rejecting this server's calls, worsening or not. Never called
+   * when a custom `fetch` is supplied -- that fetch owns this decision.
+   */
+  onEdgeRejection?: (rejection: OidcEdgeRejection) => void;
+};
+
+/**
+ * One server-to-server call to the IdP host answered by something other than
+ * the IdP's own application code -- see {@link RelyperOidcOptions.fetch}'s doc
+ * comment. `retried` is false only when the response body was a stream this
+ * client had already started sending and could not safely resend.
+ */
+export type OidcEdgeRejection = {
+  url: string;
+  status: number;
+  retried: boolean;
 };
 
 export type ResolvedRelyperOidcOptions = {
@@ -144,7 +172,15 @@ export class RelyperOidcError extends Error {
     super(message);
     this.name = 'RelyperOidcError';
     this.code = code;
-    this.status = options.status ?? 502;
+    // Not 502: this status goes straight to the browser at the end of the OIDC
+    // redirect (the callback route responds with it directly), and most CDNs/
+    // reverse proxies in front of a service provider -- Cloudflare included --
+    // replace an origin's own 5xx response with their own generic error page,
+    // discarding the real JSON body (code/message/detail) this library worked
+    // to produce. 401 survives that untouched (proxies pass 4xx through as a
+    // client-side outcome) and matches the status `idp_error` already uses for
+    // the same "this login attempt did not succeed" family of failures.
+    this.status = options.status ?? 401;
     this.cause = options.cause;
     this.detail = options.detail;
   }

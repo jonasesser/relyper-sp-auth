@@ -3,6 +3,7 @@ import type { RelyperIdentity } from '../types.js';
 import { createDiscoveryLoader, type DiscoveryLoader } from './discovery.js';
 import { defaultClaimsToIdentity } from './claims.js';
 import { codeChallengeFor, createCodeVerifier, createNonce, createState } from './pkce.js';
+import { createDefaultOidcFetch } from './edge-fetch.js';
 import {
   RelyperOidcError,
   type OidcDiscoveryDocument,
@@ -89,7 +90,13 @@ function resolveOptions(options: RelyperOidcOptions): ResolvedRelyperOidcOptions
 
 export function createRelyperOidcClient(options: RelyperOidcOptions): RelyperOidcClient {
   const resolved = resolveOptions(options);
-  const doFetch = options.fetch ?? globalThis.fetch;
+  // An app that hands us its own fetch owns this decision entirely -- e.g. a
+  // fake for tests, or a proxy-aware agent -- and is trusted to have already
+  // thought about what its host's edge protection needs, so it is used as-is.
+  // Left unset, every call here goes through this library's own default,
+  // which exists specifically because the bare global fetch does not survive
+  // a production IdP's bot protection -- see RelyperOidcOptions.fetch's doc.
+  const doFetch = options.fetch ?? createDefaultOidcFetch(resolved.clientId, options.onEdgeRejection);
   if (typeof doFetch !== 'function') {
     throw new TypeError('@relyper/sp-auth/oidc: no fetch implementation available.');
   }

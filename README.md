@@ -167,7 +167,8 @@ safe to show a user, and a `detail` safe to log.
 | `discoveryTtlMs` | `3600000` | How long the discovery document is reused. |
 | `requestTimeoutMs` | `10000` | Timeout for every call to the IdP. |
 | `mapClaims` | `defaultClaimsToIdentity` | Custom claim mapping. |
-| `fetch` | global | Custom fetch, used for discovery, tokens, UserInfo and JWKS alike. |
+| `fetch` | this library's own default | Custom fetch, used for discovery, tokens, UserInfo and JWKS alike. Left unset, the built-in default sends a descriptive User-Agent (Node's bare `"node"` gets Managed-Challenged by a production IdP's bot protection before your request is ever seen) and retries once if an edge layer -- not the IdP -- answers 403/429/502/503/504. |
+| `onEdgeRejection` | – | Called when the built-in default fetch above retries after an edge rejection. Not called if you supply your own `fetch`. |
 
 Fastify adapter additions: `sessionCookieName`, `loginCookieName`, `cookieDomain`,
 `cookiePath`, `cookieSecure`, `sessionTtlSeconds`, `sessionAbsoluteTtlSeconds`,

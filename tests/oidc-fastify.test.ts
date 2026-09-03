@@ -177,6 +177,24 @@ describe('callback route', () => {
     expect(response.statusCode).toBe(302);
     expect(response.headers.location).toBe('/login-failed?error=missing_transaction');
   });
+
+  it('answers a refused code exchange with 401, not 502 (a reverse proxy replaces an origin 502 with its own generic error page, hiding this response body entirely)', async () => {
+    idp.setTokenResponse({ status: 401, body: { error: 'invalid_client', error_description: 'client authentication failed' } });
+    const app = await buildApp();
+    const start = await app.inject({ method: 'GET', url: '/auth/login' });
+    const loginCookie = valueOf(cookieFrom(start.headers as Record<string, unknown>, 'relyper_login'));
+    const target = new URL(start.headers.location as string);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/auth/callback?code=code-1&state=' + encodeURIComponent(target.searchParams.get('state') ?? ''),
+      headers: { cookie: 'relyper_login=' + encodeURIComponent(loginCookie) }
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json().code).toBe('token_exchange_failed');
+    expect(cookieFrom(response.headers as Record<string, unknown>, 'relyper_session')).toBeNull();
+  });
 });
 
 describe('session guard', () => {
